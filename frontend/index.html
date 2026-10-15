@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Traffic Signal Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ── Reset & base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-page:      #0b0f1e;
+    --bg-surface:   #111827;
+    --bg-card:      #151d2e;
+    --bg-input:     #1a2234;
+    --bg-hover:     #1e2840;
+
+    --accent-red:   #dc2626;
+    --accent-amber: #d97706;
+    --accent-green: #16a34a;
+
+    --glow-red:    rgba(220, 38, 38, 0.25);
+    --glow-green:  rgba(22, 163, 74, 0.25);
+    --glow-amber:  rgba(217, 119, 6, 0.25);
+
+    --text-primary:   #f0f4ff;
+    --text-secondary: #8b9cc8;
+    --text-muted:     #4a5578;
+
+    --border-subtle: rgba(139, 156, 200, 0.12);
+    --border-mid:    rgba(139, 156, 200, 0.22);
+
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-body:    'Inter', system-ui, sans-serif;
+
+    --transition: 180ms ease;
+  }
+
+  html { font-size: 16px; }
+
+  body {
+    background: var(--bg-page);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid decoration ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(139,156,200,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(139,156,200,0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout wrapper ── */
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px 64px;
+  }
+
+  /* ══════════════════════════════════════
+     HEADER / NAV
+  ══════════════════════════════════════ */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0 0;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 52px;
+  }
+
+  /* ── Logo mark ── */
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 60px;
+    background: #1b1f2e;
+    border: 1.5px solid var(--border-mid);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-evenly;
+    padding: 7px 8px;
+    gap: 4px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .logo-icon::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(220,38,38,0.06), rgba(22,163,74,0.06));
+  }
+
+  .traffic-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .dot-red    { background: var(--accent-red);   box-shadow: 0 0 6px var(--glow-red); }
+  .dot-green  { background: var(--accent-green); box-shadow: 0 0 6px var(--glow-green); }
+  .dot-amber  { background: var(--accent-amber); box-shadow: 0 0 6px var(--glow-amber); opacity: 0.55; }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+
+  .logo-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+
+  .logo-sub {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 2px;
+    font-weight: 500;
+  }
+
+  /* ── Nav pills ── */
+  nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .nav-pill {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding: 7px 14px;
+    border-radius: 99px;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+    border: none;
+    background: transparent;
+  }
+
+  .nav-pill:hover, .nav-pill.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+  }
+
+  .nav-pill.active {
+    border: 1px solid var(--border-mid);
+  }
+
+  .nav-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-green);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    margin-left: 5px;
+    vertical-align: middle;
+  }
+
+  /* ══════════════════════════════════════
+     HERO
+  ══════════════════════════════════════ */
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: start;
+    margin-bottom: 52px;
+  }
+
+  .hero-left {}
+
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(22,163,74,0.12);
+    border: 1px solid rgba(22,163,74,0.25);
+    color: #4ade80;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 99px;
+    margin-bottom: 18px;
+  }
+
+  .hero-eyebrow::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    animation: pulse 2s ease infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.7); }
+  }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 2.9rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+  }
+
+  .hero h1 span {
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(240,244,255,0.35);
+  }
+
+  .hero-desc {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 360px;
+    margin-bottom: 28px;
+  }
+
+  /* Stat chips */
+  .stat-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .stat-chip {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px 18px;
+    min-width: 110px;
+  }
+
+  .stat-chip .val {
+    font-family: var(--font-display);
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .stat-chip .lbl {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Traffic light hero visual ── */
+  .hero-right {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 8px;
+  }
+
+  .traffic-light-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-xl);
+    padding: 28px 28px 24px;
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .tl-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    align-self: flex-start;
+  }
+
+  .tl-housing {
+    background: #0d1017;
+    border: 1.5px solid rgba(139,156,200,0.15);
+    border-radius: 20px;
+    padding: 18px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: center;
+    width: 100%;
+  }
+
+  .tl-dot {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid rgba(0,0,0,0.3);
+    transition: all 0.4s ease;
+  }
+
+  .tl-dot.red-off    { background: #3d1515; }
+  .tl-dot.amber-off  { background: #3d2c0a; }
+  .tl-dot.green-off  { background: #0d2d16; }
+  .tl-dot.red-on    { background: var(--accent-red);   box-shadow: 0 0 22px 6px var(--glow-red),   0 0 6px 2px rgba(220,38,38,0.7); }
+  .tl-dot.amber-on  { background: var(--accent-amber); box-shadow: 0 0 22px 6px var(--glow-amber), 0 0 6px 2px rgba(217,119,6,0.7); }
+  .tl-dot.green-on  { background: var(--accent-green); box-shadow: 0 0 22px 6px var(--glow-green), 0 0 6px 2px rgba(22,163,74,0.7); }
+
+  .tl-label {
+    margin-top: 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-align: center;
+    height: 20px;
+    transition: all 0.3s;
+    color: var(--text-secondary);
+  }
+
+  .tl-label.show-red    { color: #f87171; }
+  .tl-label.show-green  { color: #4ade80; }
+  .tl-label.show-amber  { color: #fbbf24; }
+
+  /* ══════════════════════════════════════
+     UPLOAD SECTION
+  ══════════════════════════════════════ */
+  .section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  /* Tab switcher */
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    width: fit-content;
+    margin-bottom: 20px;
+  }
+
+  .tab {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    padding: 8px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all var(--transition);
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .tab svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  .tab.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-mid);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  /* Input panels */
+  .input-panel { display: none; }
+  .input-panel.active { display: block; }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed var(--border-mid);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    padding: 52px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: rgba(139,156,200,0.45);
+    background: var(--bg-hover);
+  }
+
+  .drop-zone.has-image {
+    border-style: solid;
+    border-color: var(--border-mid);
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .drop-zone-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+  }
+
+  .drop-zone-icon svg { width: 24px; height: 24px; stroke: var(--text-secondary); }
+
+  .drop-zone-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .drop-zone-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .drop-zone-hint strong {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  #file-input { display: none; }
+
+  .preview-img {
+    width: 100%;
+    max-height: 320px;
+    object-fit: contain;
+    display: block;
+    border-radius: var(--radius-lg);
+  }
+
+  .preview-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(11,15,30,0.9));
+    padding: 24px 16px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+
+  .preview-filename {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+
+  .btn-clear {
+    font-size: 0.72rem;
+    color: #f87171;
+    cursor: pointer;
+    background: rgba(220,38,38,0.12);
+    border: 1px solid rgba(220,38,38,0.25);
+    border-radius: 99px;
+    padding: 4px 12px;
+    transition: all var(--transition);
+  }
+  .btn-clear:hover { background: rgba(220,38,38,0.22); }
+
+  /* URL input */
+  .url-field {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 13px 16px;
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    transition: border-color var(--transition);
+    outline: none;
+  }
+
+  .url-field::placeholder { color: var(--text-muted); }
+  .url-field:focus { border-color: var(--border-mid); }
+
+  /* Path input */
+  .path-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .path-field {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 13px 16px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: 'Courier New', monospace;
+    transition: border-color var(--transition);
+    outline: none;
+  }
+  .path-field:focus { border-color: var(--border-mid); }
+  .path-field::placeholder { color: var(--text-muted); }
+
+  .btn-browse {
+    background: var(--bg-card);
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 0 16px;
+    height: 46px;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-browse:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .btn-browse svg { width: 15px; height: 15px; }
+
+  /* ── Predict button ── */
+  .predict-btn {
+    margin-top: 20px;
+    width: 100%;
+    background: linear-gradient(135deg, #1b4332, #166534);
+    border: 1px solid rgba(22,163,74,0.4);
+    border-radius: var(--radius-md);
+    color: #bbf7d0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: var(--font-body);
+    padding: 15px 24px;
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    letter-spacing: 0.01em;
+  }
+
+  .predict-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #166534, #15803d);
+    border-color: rgba(22,163,74,0.6);
+    box-shadow: 0 0 20px rgba(22,163,74,0.2);
+  }
+
+  .predict-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .predict-btn svg { width: 18px; height: 18px; }
+
+  /* Spinner */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(187,247,208,0.3);
+    border-top-color: #bbf7d0;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ══════════════════════════════════════
+     RESULTS PANEL
+  ══════════════════════════════════════ */
+  .results-section {
+    margin-top: 36px;
+    display: none;
+  }
+
+  .results-section.visible { display: block; }
+
+  .result-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+  }
+
+  .result-top {
+    padding: 24px 28px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .result-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.7rem;
+  }
+
+  .result-icon.danger  { background: rgba(220,38,38,0.15);  border: 1px solid rgba(220,38,38,0.3); }
+  .result-icon.warning { background: rgba(217,119,6,0.15);  border: 1px solid rgba(217,119,6,0.3); }
+  .result-icon.safe    { background: rgba(22,163,74,0.15);  border: 1px solid rgba(22,163,74,0.3); }
+
+  .result-label-group { flex: 1; }
+
+  .result-pred-name {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .result-pred-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .result-confidence {
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .confidence-val {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .confidence-val.high   { color: #4ade80; }
+  .confidence-val.medium { color: #fbbf24; }
+  .confidence-val.low    { color: #f87171; }
+
+  .confidence-lbl {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+
+  /* Confidence bar */
+  .conf-bar-track {
+    margin: 20px 28px 0;
+    height: 5px;
+    background: var(--bg-surface);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .conf-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* Score distribution */
+  .score-grid {
+    padding: 24px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .score-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .score-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .score-name {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .score-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .score-pct {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .score-bar {
+    height: 4px;
+    background: var(--bg-surface);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.6s ease;
+    background: var(--border-mid);
+  }
+
+  .score-row.winner .score-bar-fill {
+    background: linear-gradient(90deg, #15803d, #22c55e);
+  }
+
+  /* ══════════════════════════════════════
+     INFO FOOTER STRIP
+  ══════════════════════════════════════ */
+  .info-strip {
+    margin-top: 48px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .info-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .info-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .info-card-icon svg { width: 18px; height: 18px; }
+
+  .info-card-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .info-card-body {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* ══════════════════════════════════════
+     TOAST
+  ══════════════════════════════════════ */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-mid);
+    border-radius: var(--radius-md);
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    opacity: 0;
+    transform: translateY(12px);
+    transition: all 0.3s ease;
+    z-index: 999;
+    pointer-events: none;
+    max-width: 320px;
+  }
+
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error   { border-color: rgba(220,38,38,0.35); color: #f87171; }
+  .toast.success { border-color: rgba(22,163,74,0.35); color: #4ade80; }
+
+  /* ══════════════════════════════════════
+     RESPONSIVE
+  ══════════════════════════════════════ */
+  @media (max-width: 768px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-right { display: none; }
+    .score-grid { grid-template-columns: 1fr; }
+    .info-strip { grid-template-columns: 1fr; }
+    nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- ═══════════ HEADER ═══════════ -->
+  <header>
+    <a class="logo" href="#">
+      <div class="logo-icon">
+        <div class="traffic-dot dot-red"></div>
+        <div class="traffic-dot dot-amber"></div>
+        <div class="traffic-dot dot-green"></div>
+      </div>
+      <div class="logo-text">
+        <span class="logo-title">Signal&nbsp;Vision</span>
+        <span class="logo-sub">Traffic Predictor</span>
+      </div>
+    </a>
+    <nav>
+      <button class="nav-pill active">Predict</button>
+      <button class="nav-pill">History <span class="nav-badge" id="history-count">0</span></button>
+      <button class="nav-pill">About</button>
+    </nav>
+  </header>
+
+  <!-- ═══════════ HERO ═══════════ -->
+  <section class="hero">
+    <div class="hero-left">
+      <div class="hero-eyebrow">Live · CNN Model</div>
+      <h1>Traffic Signal<br><span>Recognition</span><br>at a glance</h1>
+      <p class="hero-desc">Upload any traffic sign image — our convolutional neural network classifies it across 7 categories in real time, no road experience required.</p>
+      <div class="stat-row">
+        <div class="stat-chip">
+          <div class="val">7</div>
+          <div class="lbl">Sign classes</div>
+        </div>
+        <div class="stat-chip">
+          <div class="val">CNN</div>
+          <div class="lbl">Architecture</div>
+        </div>
+        <div class="stat-chip">
+          <div class="val">v1.0</div>
+          <div class="lbl">Model</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Traffic light animation -->
+    <div class="hero-right">
+      <div class="traffic-light-card">
+        <div class="tl-header">Signal state</div>
+        <div class="tl-housing">
+          <div class="tl-dot red-off"   id="tl-red"></div>
+          <div class="tl-dot amber-off" id="tl-amber"></div>
+          <div class="tl-dot green-on"  id="tl-green"></div>
+        </div>
+        <div class="tl-label show-green" id="tl-label">Ready to predict</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ UPLOAD SECTION ═══════════ -->
+  <div class="section-label">Upload image</div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab active" data-tab="file" onclick="switchTab('file', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 12l2 2 4-4"/></svg>
+      Upload file
+    </button>
+    <button class="tab" data-tab="url" onclick="switchTab('url', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      Image URL
+    </button>
+    <button class="tab" data-tab="path" onclick="switchTab('path', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6l3 1m0 0-3 9a5.002 5.002 0 0 0 6.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1-3 9a5.002 5.002 0 0 0 6.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+      File path
+    </button>
+  </div>
+
+  <!-- File upload tab -->
+  <div class="input-panel active" id="panel-file">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-zone-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <div class="drop-zone-title" id="dz-title">Drop your image here</div>
+      <div class="drop-zone-hint" id="dz-hint">or <strong>click to browse</strong> · PNG, JPG, WEBP up to 10MB</div>
+      <img class="preview-img" id="preview-img" style="display:none;" alt="Preview" />
+      <div class="preview-overlay" id="preview-overlay" style="display:none;">
+        <span class="preview-filename" id="preview-filename"></span>
+        <button class="btn-clear" onclick="clearImage(event)">Remove</button>
+      </div>
+    </div>
+    <input type="file" id="file-input" accept="image/*" />
+  </div>
+
+  <!-- URL tab -->
+  <div class="input-panel" id="panel-url">
+    <input type="url" class="url-field" id="url-input" placeholder="https://example.com/traffic-sign.jpg" />
+  </div>
+
+  <!-- Path tab -->
+  <div class="input-panel" id="panel-path">
+    <div class="path-row">
+      <input type="text" class="path-field" id="path-input" placeholder="C:\path\to\sign_image.jpg" />
+      <button class="btn-browse" onclick="document.getElementById('file-input').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Browse
+      </button>
+    </div>
+  </div>
+
+  <!-- Predict button -->
+  <button class="predict-btn" id="predict-btn" onclick="runPrediction()">
+    <svg id="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="5 3 19 12 5 21 5 3"/>
+    </svg>
+    <div class="spinner" id="btn-spinner"></div>
+    <span id="btn-text">Analyse Image</span>
+  </button>
+
+  <!-- ═══════════ RESULTS ═══════════ -->
+  <div class="results-section" id="results-section">
+    <div class="section-label" style="margin-top: 0;">Prediction result</div>
+    <div class="result-card">
+      <div class="result-top">
+        <div class="result-icon" id="result-icon">🚦</div>
+        <div class="result-label-group">
+          <div class="result-pred-name" id="result-name">—</div>
+          <div class="result-pred-meta" id="result-meta">—</div>
+        </div>
+        <div class="result-confidence">
+          <div class="confidence-val high" id="conf-val">—</div>
+          <div class="confidence-lbl">Confidence</div>
+        </div>
+      </div>
+      <div class="conf-bar-track">
+        <div class="conf-bar-fill" id="conf-bar" style="width:0%; background: linear-gradient(90deg, #15803d, #22c55e);"></div>
+      </div>
+      <div class="score-grid" id="score-grid"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ INFO STRIP ═══════════ -->
+  <div class="info-strip">
+    <div class="info-card">
+      <div class="info-card-icon" style="background: rgba(22,163,74,0.12); border: 1px solid rgba(22,163,74,0.2);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="info-card-title">CNN Architecture</div>
+      <div class="info-card-body">Convolutional neural network trained on 7 traffic sign categories using TensorFlow/Keras.</div>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon" style="background: rgba(139,156,200,0.1); border: 1px solid var(--border-subtle);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="info-card-title">Real-time analysis</div>
+      <div class="info-card-body">FastAPI backend serves predictions over REST — results delivered in milliseconds per image.</div>
+    </div>
+    <div class="info-card">
+      <div class="info-card-icon" style="background: rgba(217,119,6,0.12); border: 1px solid rgba(217,119,6,0.2);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      </div>
+      <div class="info-card-title">7 sign categories</div>
+      <div class="info-card-body">No Entry, No Horn, No U-Turn, Speed Limit 15, Stop Sign, U-Turn, and Zebra Crossing.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ═══════════ SCRIPTS ═══════════ -->
+<script>
+/* ── Data: matches exactly the 7 classes from our CNN model ── */
+const CLASSES = [
+  { name: 'No Entry',           emoji: '⛔', type: 'danger',  color: '#ef4444', desc: 'Entry prohibited — do not enter this road' },
+  { name: 'No Horn',            emoji: '🔇', type: 'warning', color: '#f59e0b', desc: 'Silence zone — no honking allowed' },
+  { name: 'No U-Turn',         emoji: '↩️', type: 'warning', color: '#f59e0b', desc: 'U-turns are prohibited at this junction' },
+  { name: 'Speed Limit',        emoji: '🔢', type: 'safe',    color: '#60a5fa', desc: 'Maximum speed limit: 15 km/h' },
+  { name: 'Stop Sign',          emoji: '🛑', type: 'danger',  color: '#ef4444', desc: 'Mandatory full stop required' },
+  { name: 'U-Turn',             emoji: '↪️', type: 'safe',    color: '#4ade80', desc: 'U-turn permitted at this location' },
+  { name: 'Pedestrian Crossing',emoji: '🚶', type: 'warning', color: '#fbbf24', desc: 'Watch for crossing pedestrians' },
+];
+
+/* ── State ── */
+let currentTab = 'file';
+let imageFile  = null;
+let historyCount = 0;
+
+/* ── Tab switcher ── */
+function switchTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.input-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+/* ── File handling ── */
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadFile(f);
+  else showToast('Please drop an image file.', 'error');
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) loadFile(fileInput.files[0]);
+});
+
+function loadFile(f) {
+  imageFile = f;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = document.getElementById('preview-img');
+    img.src = ev.target.result;
+    img.style.display = 'block';
+    document.getElementById('dz-title').style.display = 'none';
+    document.getElementById('dz-hint').style.display = 'none';
+    document.querySelector('.drop-zone-icon').style.display = 'none';
+    document.getElementById('preview-filename').textContent = f.name;
+    document.getElementById('preview-overlay').style.display = 'flex';
+    dropZone.classList.add('has-image');
+  };
+  reader.readAsDataURL(f);
+}
+
+function clearImage(e) {
+  e.stopPropagation();
+  imageFile = null;
+  document.getElementById('preview-img').style.display = 'none';
+  document.getElementById('preview-overlay').style.display = 'none';
+  document.getElementById('dz-title').style.display = 'block';
+  document.getElementById('dz-hint').style.display = 'block';
+  document.querySelector('.drop-zone-icon').style.display = 'flex';
+  dropZone.classList.remove('has-image');
+  fileInput.value = '';
+}
+
+/* ── Traffic light animation ── */
+function setTrafficLight(state) {
+  const off = { red: 'red-off', amber: 'amber-off', green: 'green-off' };
+  const on  = { red: 'red-on',  amber: 'amber-on',  green: 'green-on'  };
+  const label = document.getElementById('tl-label');
+
+  Object.keys(off).forEach(c => {
+    document.getElementById('tl-' + c).className = 'tl-dot ' + off[c];
+  });
+  label.className = 'tl-label';
+
+  if (state === 'loading') {
+    let i = 0; const order = ['red','amber','green'];
+    const seq = setInterval(() => {
+      Object.keys(off).forEach(c => {
+        document.getElementById('tl-' + c).className = 'tl-dot ' + off[c];
+      });
+      document.getElementById('tl-' + order[i % 3]).className = 'tl-dot ' + on[order[i % 3]];
+      i++;
+    }, 350);
+    return seq;
+  }
+
+  if (state === 'danger') {
+    document.getElementById('tl-red').className = 'tl-dot red-on';
+    label.className = 'tl-label show-red'; label.textContent = 'Stop / No entry';
+  } else if (state === 'warning') {
+    document.getElementById('tl-amber').className = 'tl-dot amber-on';
+    label.className = 'tl-label show-amber'; label.textContent = 'Caution needed';
+  } else {
+    document.getElementById('tl-green').className = 'tl-dot green-on';
+    label.className = 'tl-label show-green'; label.textContent = 'Ready to predict';
+  }
+}
+
+/* ── Predict ── */
+let loadingInterval = null;
+
+async function runPrediction() {
+  const hasFile = imageFile !== null;
+  const urlVal  = document.getElementById('url-input').value.trim();
+  const pathVal = document.getElementById('path-input').value.trim();
+
+  if (currentTab === 'file' && !hasFile) { showToast('Please select or drop an image first.', 'error'); return; }
+  if (currentTab === 'url'  && !urlVal)  { showToast('Please enter an image URL.', 'error'); return; }
+  if (currentTab === 'path' && !pathVal) { showToast('Please enter a file path.', 'error'); return; }
+
+  /* UI → loading */
+  const btn = document.getElementById('predict-btn');
+  btn.disabled = true;
+  document.getElementById('btn-icon').style.display = 'none';
+  document.getElementById('btn-spinner').style.display = 'block';
+  document.getElementById('btn-text').textContent = 'Analysing…';
+  loadingInterval = setTrafficLight('loading');
+
+  try {
+    let response;
+
+    if (currentTab === 'file' && imageFile) {
+      /* ── File upload → /predict/file (multipart) ── */
+      const formData = new FormData();
+      formData.append('file', imageFile);
+      response = await fetch('/predict/file', { method: 'POST', body: formData });
+    } else if (currentTab === 'url') {
+      /* ── URL → /predict/url (JSON) ── */
+      response = await fetch('/predict/url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlVal })
+      });
+    } else {
+      /* ── Local path: user picks file via browse, we upload it ── */
+      showToast('For local files, use the Upload File tab and browse to select the file.', 'error');
+      resetBtn();
+      return;
+    }
+
+    if (response.ok) {
+      const raw = await response.json();
+      /* Normalise response: backend returns predicted_class + confidence (0-100) */
+      const clsName  = raw.predicted_class || raw.prediction || 'Unknown';
+      const confFrac = raw.confidence > 1 ? raw.confidence / 100 : raw.confidence;
+      const scores   = raw.scores || buildFakeScores(clsName, confFrac);
+      showResult({ prediction: clsName, confidence: confFrac, scores });
+    } else {
+      throw new Error('Server returned ' + response.status);
+    }
+  } catch (err) {
+    showToast('Error: ' + err.message, 'error');
+    setTrafficLight('safe');
+  }
+
+  resetBtn();
+}
+
+function resetBtn() {
+  clearInterval(loadingInterval);
+  const btn = document.getElementById('predict-btn');
+  btn.disabled = false;
+  document.getElementById('btn-icon').style.display = 'block';
+  document.getElementById('btn-spinner').style.display = 'none';
+  document.getElementById('btn-text').textContent = 'Analyse Image';
+}
+
+/* Build placeholder scores when backend doesn't return them */
+function buildFakeScores(winner, winConf) {
+  const scores = {};
+  let remaining = 1 - winConf;
+  CLASSES.forEach(c => {
+    if (c.name === winner) {
+      scores[c.name] = winConf;
+    } else {
+      const s = Math.random() * remaining * 0.5;
+      scores[c.name] = s;
+      remaining -= s;
+    }
+  });
+  return scores;
+}
+
+/* ── Render results ── */
+function showResult(data) {
+  const { prediction, confidence, scores } = data;
+  const cls = CLASSES.find(c => c.name === prediction) || {
+    name: prediction, emoji: '🚦', type: 'safe', color: '#94a3b8', desc: 'Traffic sign detected'
+  };
+
+  /* Traffic light */
+  setTrafficLight(cls.type);
+
+  /* Top section */
+  const icon = document.getElementById('result-icon');
+  icon.textContent = cls.emoji;
+  icon.className = 'result-icon ' + cls.type;
+  document.getElementById('result-name').textContent = cls.name;
+  document.getElementById('result-meta').textContent = cls.desc;
+
+  const pct = Math.round(confidence * 100);
+  const confEl = document.getElementById('conf-val');
+  confEl.textContent = pct + '%';
+  confEl.className = 'confidence-val ' + (pct >= 80 ? 'high' : pct >= 55 ? 'medium' : 'low');
+
+  /* Confidence bar */
+  const barColor = pct >= 80
+    ? 'linear-gradient(90deg, #15803d, #22c55e)'
+    : pct >= 55
+    ? 'linear-gradient(90deg, #92400e, #fbbf24)'
+    : 'linear-gradient(90deg, #991b1b, #f87171)';
+
+  const bar = document.getElementById('conf-bar');
+  bar.style.background = barColor;
+  setTimeout(() => { bar.style.width = pct + '%'; }, 80);
+
+  /* Score grid */
+  const grid = document.getElementById('score-grid');
+  grid.innerHTML = '';
+
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  sorted.forEach(([name, score]) => {
+    const c = CLASSES.find(cl => cl.name === name);
+    const isWinner = name === prediction;
+    const p = Math.round(score * 100);
+    const row = document.createElement('div');
+    row.className = 'score-row' + (isWinner ? ' winner' : '');
+    row.innerHTML = `
+      <div class="score-top">
+        <span class="score-name">
+          <span class="score-dot" style="background:${c ? c.color : '#888'}"></span>
+          ${name}
+        </span>
+        <span class="score-pct">${p}%</span>
+      </div>
+      <div class="score-bar">
+        <div class="score-bar-fill" style="width:0%" data-target="${p}"></div>
+      </div>`;
+    grid.appendChild(row);
+  });
+
+  /* Show section */
+  const section = document.getElementById('results-section');
+  section.classList.add('visible');
+  section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  /* Animate bars */
+  setTimeout(() => {
+    grid.querySelectorAll('.score-bar-fill').forEach(el => {
+      el.style.width = el.dataset.target + '%';
+    });
+  }, 120);
+
+  /* History counter */
+  historyCount++;
+  document.getElementById('history-count').textContent = historyCount;
+
+  showToast('Prediction complete — ' + prediction, 'success');
+}
+
+/* ── Toast helper ── */
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+/* ── Init ── */
+setTrafficLight('safe');
+</script>
+</body>
+</html>
